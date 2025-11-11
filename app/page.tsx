@@ -26,27 +26,16 @@ useEffect(() => {
     try {
       await liff.init({ liffId: process.env.NEXT_PUBLIC_LIFF_ID! });
 
-      // ตรวจจับ Dark Mode ด้วยวิธีที่ถูกต้องที่สุดใน LIFF ปี 2025
-      const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-
-      if (prefersDark) {
-        document.documentElement.classList.add("dark");
-      } else {
-        document.documentElement.classList.remove("dark");
-      }
-
-      // Optional: ถ้า theme เปลี่ยนระหว่างใช้งาน (คนสลับ dark/light ใน LINE)
-      const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-      const handleChange = (e: MediaQueryListEvent) => {
-        if (e.matches) {
-          document.documentElement.classList.add("dark");
-        } else {
-          document.documentElement.classList.remove("dark");
-        }
+      // Dark mode
+      const applyTheme = () => {
+        const isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+        document.documentElement.classList.toggle("dark", isDark);
       };
-      mediaQuery.addEventListener("change", handleChange);
+      applyTheme();
+      window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", applyTheme);
 
-      if (!liff.isLoggedIn()) {
+      // แก้บัค iOS เด้ง login ซ้ำ (วิธีที่ดีที่สุดปี 2025)
+      if (!liff.isLoggedIn() && !liff.getAccessToken()) {
         liff.login();
         return;
       }
@@ -59,8 +48,11 @@ useEffect(() => {
       });
 
       await fetchPoints(prof.userId);
-    } catch (err) {
+    } catch (err: any) {
       console.error("LIFF init error:", err);
+      if (err?.code === "INIT_FAILED") {
+        liff.login();
+      }
     } finally {
       setLoading(false);
     }
@@ -68,10 +60,8 @@ useEffect(() => {
 
   init();
 
-  // Cleanup listener เมื่อ component unmount
   return () => {
-    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-    mediaQuery.removeEventListener("change", () => {});
+    window.matchMedia("(prefers-color-scheme: dark)").removeEventListener("change", () => {});
   };
 }, []);
 
