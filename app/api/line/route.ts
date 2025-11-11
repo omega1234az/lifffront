@@ -1,25 +1,12 @@
-import type { NextApiRequest, NextApiResponse } from "next";
+// ✅ app/api/line/route.ts (Next.js 15 style)
 
-type RequestBody = {
-  userId: string;
-  message: string;
-};
+import { NextRequest, NextResponse } from "next/server";
 
-// LINE Messaging API endpoint
-const LINE_PUSH_URL = "https://api.line.me/v2/bot/message/push";
-
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse
-) {
-  if (req.method !== "POST") {
-    res.setHeader("Allow", "POST");
-    return res.status(405).end("Method Not Allowed");
-  }
-  const { userId, message } = req.body as RequestBody;
-
+export async function POST(req: NextRequest) {
   try {
-    const response = await fetch(LINE_PUSH_URL, {
+    const { userId, message } = await req.json();
+
+    const resp = await fetch("https://api.line.me/v2/bot/message/push", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -27,24 +14,19 @@ export default async function handler(
       },
       body: JSON.stringify({
         to: userId,
-        messages: [
-          {
-            type: "text",
-            text: message,
-          },
-        ],
+        messages: [{ type: "text", text: message }],
       }),
     });
 
-    const json = await response.json();
-    if (!response.ok) {
-      console.error("LINE API error", json);
-      return res.status(response.status).json({ error: json });
+    const data = await resp.json();
+
+    if (!resp.ok) {
+      return NextResponse.json({ error: data }, { status: resp.status });
     }
 
-    return res.status(200).json({ success: true, result: json });
+    return NextResponse.json({ success: true, data });
   } catch (err) {
-    console.error("API route error:", err);
-    return res.status(500).json({ error: "Internal Server Error" });
+    console.error(err);
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }
