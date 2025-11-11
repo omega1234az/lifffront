@@ -22,48 +22,54 @@ export default function RedeemLIFF() {
 
   // เพิ่ม: ตรวจจับและปรับตาม Theme ของ LINE (Light/Dark)
 useEffect(() => {
-  const init = async () => {
-    try {
-      await liff.init({ liffId: process.env.NEXT_PUBLIC_LIFF_ID! });
+    const init = async () => {
+      try {
+        await liff.init({ liffId: process.env.NEXT_PUBLIC_LIFF_ID! });
 
-      // Dark mode
-      const applyTheme = () => {
-        const isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-        document.documentElement.classList.toggle("dark", isDark);
-      };
-      applyTheme();
-      window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", applyTheme);
+        // Dark mode support
+        const applyTheme = () => {
+          const isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+          document.documentElement.classList.toggle("dark", isDark);
+        };
+        applyTheme();
+        window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", applyTheme);
 
-      // แก้บัค iOS เด้ง login ซ้ำ (วิธีที่ดีที่สุดปี 2025)
-      if (!liff.isLoggedIn() && !liff.getAccessToken()) {
-        liff.login();
-        return;
+        // แก้บัค iOS - ตรวจสอบ login แบบปลอดภัย
+        if (!liff.isLoggedIn()) {
+          // ใช้ redirectUri ชัดเจน เพื่อป้องกันการ loop
+          liff.login({ redirectUri: window.location.href });
+          return; // หยุดการทำงานทันที หลัง redirect
+        }
+
+        // ดึงข้อมูล profile เมื่อ login แล้ว
+        const prof = await liff.getProfile();
+        setProfile({
+          displayName: prof.displayName || "ลูกค้า",
+          userId: prof.userId,
+          pictureUrl: prof.pictureUrl,
+        });
+
+        await fetchPoints(prof.userId);
+      } catch (err: any) {
+        console.error("LIFF init error:", err);
+        // จัดการ error แบบเฉพาะเจาะจง
+        if (err?.code === "INIT_FAILED" || err?.message?.includes("LIFF")) {
+          // ลองใหม่หลังจาก 1 วินาที (กรณี network issue)
+          setTimeout(() => {
+            window.location.reload();
+          }, 1000);
+        }
+      } finally {
+        setLoading(false);
       }
+    };
 
-      const prof = await liff.getProfile();
-      setProfile({
-        displayName: prof.displayName || "ลูกค้า",
-        userId: prof.userId,
-        pictureUrl: prof.pictureUrl,
-      });
+    init();
 
-      await fetchPoints(prof.userId);
-    } catch (err: any) {
-      console.error("LIFF init error:", err);
-      if (err?.code === "INIT_FAILED") {
-        liff.login();
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  init();
-
-  return () => {
-    window.matchMedia("(prefers-color-scheme: dark)").removeEventListener("change", () => {});
-  };
-}, []);
+    return () => {
+      window.matchMedia("(prefers-color-scheme: dark)").removeEventListener("change", () => {});
+    };
+  }, []);
 
   const fetchPoints = async (userId: string) => {
     try {
