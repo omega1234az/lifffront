@@ -20,33 +20,60 @@ export default function RedeemLIFF() {
 
   const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3000";
 
-  useEffect(() => {
-    const init = async () => {
-      try {
-        await liff.init({ liffId: process.env.NEXT_PUBLIC_LIFF_ID! });
-        if (!liff.isLoggedIn()) {
-          liff.login();
-          return;
-        }
+  // เพิ่ม: ตรวจจับและปรับตาม Theme ของ LINE (Light/Dark)
+useEffect(() => {
+  const init = async () => {
+    try {
+      await liff.init({ liffId: process.env.NEXT_PUBLIC_LIFF_ID! });
 
-        const prof = await liff.getProfile();
-        setProfile({
-          displayName: prof.displayName || "ลูกค้า",
-          userId: prof.userId,
-          pictureUrl: prof.pictureUrl,
-        });
+      // ตรวจจับ Dark Mode ด้วยวิธีที่ถูกต้องที่สุดใน LIFF ปี 2025
+      const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
 
-        // ดึงแต้มทันที
-        await fetchPoints(prof.userId);
-      } catch (err) {
-        console.error("LIFF init error:", err);
-      } finally {
-        setLoading(false);
+      if (prefersDark) {
+        document.documentElement.classList.add("dark");
+      } else {
+        document.documentElement.classList.remove("dark");
       }
-    };
 
-    init();
-  }, []);
+      // Optional: ถ้า theme เปลี่ยนระหว่างใช้งาน (คนสลับ dark/light ใน LINE)
+      const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+      const handleChange = (e: MediaQueryListEvent) => {
+        if (e.matches) {
+          document.documentElement.classList.add("dark");
+        } else {
+          document.documentElement.classList.remove("dark");
+        }
+      };
+      mediaQuery.addEventListener("change", handleChange);
+
+      if (!liff.isLoggedIn()) {
+        liff.login();
+        return;
+      }
+
+      const prof = await liff.getProfile();
+      setProfile({
+        displayName: prof.displayName || "ลูกค้า",
+        userId: prof.userId,
+        pictureUrl: prof.pictureUrl,
+      });
+
+      await fetchPoints(prof.userId);
+    } catch (err) {
+      console.error("LIFF init error:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  init();
+
+  // Cleanup listener เมื่อ component unmount
+  return () => {
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    mediaQuery.removeEventListener("change", () => {});
+  };
+}, []);
 
   const fetchPoints = async (userId: string) => {
     try {
@@ -95,107 +122,104 @@ export default function RedeemLIFF() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-gray-600" />
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+        <Loader2 className="w-10 h-10 animate-spin text-gray-600 dark:text-gray-300" />
       </div>
     );
   }
 
   return (
-    <>
-      <div className="min-h-screen bg-gray-50">
-        {/* Header */}
-        <header className="bg-white border-b border-gray-200 px-6 py-5">
-          <div className="max-w-2xl mx-auto flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Gift className="w-7 h-7 text-gray-700" />
-              <h1 className="text-xl font-semibold text-gray-900">ระบบสะสมแต้ม</h1>
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
+      {/* Header */}
+      <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-4 sticky top-0 z-10">
+        <div className="max-w-2xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <Gift className="w-6 h-6 text-gray-700 dark:text-gray-200" />
+            <h1 className="text-lg font-semibold">ระบบสะสมแต้ม</h1>
+          </div>
+          {profile && (
+            <div className="flex items-center gap-2">
+              <User className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+              <span className="text-sm">{profile.displayName.split(" ")[0]}</span>
             </div>
-            {profile && (
-              <div className="flex items-center gap-2">
-                <User className="w-5 h-5 text-gray-500" />
-                <span className="text-sm text-gray-600">{profile.displayName.split(" ")[0]}</span>
-              </div>
-            )}
-          </div>
-        </header>
+          )}
+        </div>
+      </header>
 
-        {/* Main Content */}
-        <main className="max-w-2xl mx-auto px-6 py-8">
-          {/* Points Card */}
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 mb-8">
-            <div className="text-center">
-              <p className="text-sm text-gray-500 mb-2">ยอดแต้มสะสมปัจจุบัน</p>
-              <p className="text-5xl font-bold text-gray-900">
-                {points !== null ? points.toLocaleString() : "-"}
-              </p>
-              <p className="text-sm text-gray-500 mt-2">แต้ม</p>
+      {/* Main Content - ลดขนาดลงให้เหมาะกับมือถือ */}
+      <main className="max-w-lg mx-auto px-4 py-6 pb-20">
+        {/* Points Card */}
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 p-6 mb-6">
+          <div className="text-center">
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">ยอดแต้มสะสมปัจจุบัน</p>
+            <p className="text-5xl font-bold">
+              {points !== null ? points.toLocaleString() : "-"}
+            </p>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">แต้ม</p>
+          </div>
+        </div>
+
+        {/* Redeem Form */}
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 p-6">
+          <h2 className="text-lg font-medium mb-5">กรอกรหัสรับแต้ม</h2>
+
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <input
+              type="text"
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              placeholder="กรอกรหัสที่นี่"
+              className="w-full px-4 py-3.5 border border-gray-300 dark:border-gray-600 rounded-xl text-base placeholder:text-gray-400 dark:placeholder:text-gray-500 bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-gray-300 focus:border-transparent transition-all"
+              maxLength={20}
+              disabled={submitting}
+              autoFocus
+            />
+
+            <button
+              type="submit"
+              disabled={submitting || !code.trim()}
+              className={`w-full py-3.5 rounded-xl font-medium text-base transition-all flex items-center justify-center gap-2 ${
+                submitting || !code.trim()
+                  ? "bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed"
+                  : "bg-gray-900 dark:bg-white text-white dark:text-gray-900 hover:bg-gray-800 active:bg-gray-700 shadow-md"
+              }`}
+            >
+              {submitting ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  กำลังตรวจสอบ...
+                </>
+              ) : (
+                "ยืนยันรหัส"
+              )}
+            </button>
+          </form>
+
+          {/* Result */}
+          {result && (
+            <div
+              className={`mt-5 p-4 rounded-xl border font-medium flex items-center gap-3 ${
+                result.success
+                  ? "bg-green-50 dark:bg-green-900/20 border-green-300 dark:border-green-700 text-green-800 dark:text-green-300"
+                  : "bg-red-50 dark:bg-red-900/20 border-red-300 dark:border-red-700 text-red-800 dark:text-red-300"
+              }`}
+            >
+              {result.success ? (
+                <CheckCircle2 className="w-6 h-6 flex-shrink-0" />
+              ) : (
+                <XCircle className="w-6 h-6 flex-shrink-0" />
+              )}
+              <p>{result.message}</p>
             </div>
-          </div>
+          )}
+        </div>
 
-          {/* Redeem Form */}
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
-            <h2 className="text-lg font-medium text-gray-900 mb-6">กรอกรหัสรับแต้ม</h2>
-
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <input
-                type="text"
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
-                placeholder="กรอกรหัสที่นี่"
-                className="w-full px-5 py-4 border border-gray-300 rounded-xl text-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-all"
-                maxLength={20}
-                disabled={submitting}
-              />
-
-              <button
-                type="submit"
-                disabled={submitting || !code.trim()}
-                className={`w-full py-4 rounded-xl font-medium text-lg transition-all ${
-                  submitting || !code.trim()
-                    ? "bg-gray-200 text-gray-500 cursor-not-allowed"
-                    : "bg-gray-900 text-white hover:bg-gray-800 active:bg-gray-700"
-                }`}
-              >
-                {submitting ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                    กำลังตรวจสอบ...
-                  </span>
-                ) : (
-                  "ยืนยันรหัส"
-                )}
-              </button>
-            </form>
-
-            {/* Result */}
-            {result && (
-              <div
-                className={`mt-6 p-5 rounded-xl border ${
-                  result.success
-                    ? "bg-green-50 border-green-200 text-green-800"
-                    : "bg-red-50 border-red-200 text-red-800"
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  {result.success ? (
-                    <CheckCircle2 className="w-6 h-6" />
-                  ) : (
-                    <XCircle className="w-6 h-6" />
-                  )}
-                  <p className="font-medium">{result.message}</p>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Footer Info */}
-          <div className="mt-8 text-center text-xs text-gray-500">
-            <p>พิมพ์ "แลกรางวัล" ในแชทเพื่อดูของที่แลกได้</p>
-            <p className="mt-1">หรือ "แต้มของฉัน" เพื่อดูยอดแต้ม</p>
-          </div>
-        </main>
-      </div>
-    </>
+        {/* Footer Info */}
+        <div className="mt-8 text-center text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+          <p>พิมพ์ "แลกรางวัล" ในแชทเพื่อดูของที่แลกได้</p>
+          <p className="mt-1">หรือ "แต้มของฉัน" เพื่อดูยอดแต้ม</p>
+        </div>
+      </main>
+    </div>
   );
 }
